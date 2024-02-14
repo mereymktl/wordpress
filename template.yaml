@@ -42,8 +42,6 @@ Resources:
                   - "ssm:GetParameters"
                 Resource: "*"
 
-
-Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -111,7 +109,7 @@ Resources:
           tar -xzf latest.tar.gz -C /var/www/html/
           cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
           sed -i 's/database_name_here/wordpress/g' /var/www/html/wordpress/wp-config.php
-          sed -i 's/username_here/{{resolve:ssm:/wordpress/db-username}}/g' /var/www/html/wordpress/wp-config.php
+          sed -i 's/username_here/{{resolve:ssm:/wordpress/db-username:1}}/g' /var/www/html/wordpress/wp-config.php
           sed -i 's/password_here/{{resolve:ssm-secure:/wordpress/db-password}}/g' /var/www/html/wordpress/wp-config.php
           chown -R apache:apache /var/www/html/wordpress
           systemctl restart httpd
@@ -131,28 +129,4 @@ Resources:
           CidrIp: 0.0.0.0/0
 
   DBSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Subnet group for RDS
-      SubnetIds: [!Ref PrivateSubnet]
-
-  DBInstance:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBName: !Ref DBName
-      DBInstanceIdentifier: WordPressDB
-      AllocatedStorage: 10
-      DBInstanceClass: db.t2.micro
-      Engine: mysql
-      EngineVersion: '5.7'
-      MasterUsername: '{{resolve:ssm:/wordpress/db-username}}'
-      MasterUserPassword: '{{resolve:ssm-secure:/wordpress/db-password}}'
-      DBSubnetGroupName: !Ref DBSubnetGroup
-
-Outputs:
-  WebsiteURL:
-    Description: URL for WordPress website
-    Value: !Sub "http://${WebServerInstance.PublicDnsName}/wordpress"
-    Export:
-      Name: WebsiteURL
-# just a comment to see if working
+    Type: AWS::RDS
