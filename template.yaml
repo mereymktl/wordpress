@@ -111,7 +111,7 @@ Resources:
           tar -xzf latest.tar.gz -C /var/www/html/
           cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
           sed -i 's/database_name_here/wordpress/g' /var/www/html/wordpress/wp-config.php
-          sed -i 's/username_here/{{resolve:ssm-secure:/wordpress/db-username}}/g' /var/www/html/wordpress/wp-config.php
+          sed -i 's/username_here/{{resolve:ssm:/wordpress/db-username}}/g' /var/www/html/wordpress/wp-config.php
           sed -i 's/password_here/{{resolve:ssm-secure:/wordpress/db-password}}/g' /var/www/html/wordpress/wp-config.php
           chown -R apache:apache /var/www/html/wordpress
           systemctl restart httpd
@@ -145,7 +145,7 @@ Resources:
       DBInstanceClass: db.t2.micro
       Engine: mysql
       EngineVersion: '5.7'
-      MasterUsername: '{{resolve:ssm-secure:/wordpress/db-username}}'
+      MasterUsername: '{{resolve:ssm:/wordpress/db-username}}'
       MasterUserPassword: '{{resolve:ssm-secure:/wordpress/db-password}}'
       DBSubnetGroupName: !Ref DBSubnetGroup
 
