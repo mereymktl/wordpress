@@ -1,11 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Wordpress inside the public subnet and rds inside the private subnet.
+Description: Wordpress inside the public subnet and RDS inside the private subnet.
 
 Parameters:
   DBName:
     Description: Name for the WordPress database
     Type: String
-    Default: wordpress
+    Default: demo_db
 
 Resources:
   CloudFormationRole:
@@ -26,18 +26,8 @@ Resources:
             Statement:
               - Effect: "Allow"
                 Action:
-                  - "ec2:CreateVpc"
-                  - "ec2:CreateSubnet"
-                  - "ec2:CreateInternetGateway"
-                  - "ec2:AttachInternetGateway"
-                  - "ec2:CreateRouteTable"
-                  - "ec2:CreateRoute"
-                  - "ec2:AssociateRouteTable"
-                  - "ec2:CreateSecurityGroup"
-                  - "ec2:RunInstances"
-                  - "ec2:DescribeInstances"
-                  - "rds:CreateDBInstance"
-                  - "rds:DescribeDBInstances"
+                  - "ec2:*"
+                  - "rds:*"
                   - "ssm:GetParameter"
                   - "ssm:GetParameters"
                 Resource: "*"
@@ -52,6 +42,7 @@ Resources:
     Properties:
       VpcId: !Ref VPC
       CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [0, !GetAZs '']
 
   PrivateSubnet:
@@ -89,34 +80,10 @@ Resources:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref RouteTable
 
-  WebServerInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: ami-0134dde2b68fe1b07  # Specify the RHEL AMI ID
-      InstanceType: t2.micro
-      KeyName: !Sub "${AWS::Region}/wordpress/demo-keypair"
-      SecurityGroups:
-        - !Ref WebServerSecurityGroup
-      SubnetId: !Ref PublicSubnet
-      UserData:
-        Fn::Base64: |
-          #!/bin/bash
-          yum update -y
-          yum install -y httpd php php-mysqlnd
-          systemctl start httpd
-          systemctl enable httpd
-          wget https://wordpress.org/latest.tar.gz
-          tar -xzf latest.tar.gz -C /var/www/html/
-          cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
-          sed -i 's/database_name_here/wordpress/g' /var/www/html/wordpress/wp-config.php
-          sed -i 's/username_here/{{resolve:ssm:/wordpress/db-username:1}}/g' /var/www/html/wordpress/wp-config.php
-          sed -i 's/password_here/{{resolve:ssm-secure:/wordpress/db-password}}/g' /var/www/html/wordpress/wp-config.php
-          chown -R apache:apache /var/www/html/wordpress
-          systemctl restart httpd
-
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref VPC
       GroupDescription: Enable HTTP and SSH access
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -128,5 +95,50 @@ Resources:
           ToPort: 80
           CidrIp: 0.0.0.0/0
 
+  WebServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-0134dde2b68fe1b07  # Ensure this AMI ID is correct for your region
+      InstanceType: t2.micro
+      KeyName: !Sub "${AWS::Region}/wordpress/demo-keypair"
+      SecurityGroupIds:
+        - !GetAtt WebServerSecurityGroup.GroupId
+      SubnetId: !Ref PublicSubnet
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd php php-mysqlnd
+          systemctl start httpd
+          systemctl enable httpd
+          wget https://wordpress.org/latest.tar.gz
+          tar -xzf latest.tar.gz -C /var/www/html/
+          cp /var/www/html/wordpress/wp-config-sample.php /var/www/html/wordpress/wp-config.php
+          sed -i 's/database_name_here/${DBName}/g' /var/www/html/wordpress/wp-config.php
+          sed -i 's/username_here/{{resolve:ssm:/wordpress/db-username}}/g' /var/www/html/wordpress/wp-config.php
+          sed -i 's/password_here/{{resolve:ssm-secure:/wordpress/db-password}}/g' /var/www/html/wordpress/wp-config.php
+          chown -R apache:apache /var/www/html/wordpress
+          systemctl restart httpd
+
   DBSubnetGroup:
-    Type: AWS::RDS
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnet Group for RDS"
+      SubnetIds:
+        - !Ref PrivateSubnet
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: db.t3.micro
+      Engine: "mysql"
+      DBName: !Ref DBName
+      MasterUsername: '{{resolve:ssm:/wordpress/db-username}}'
+      MasterUserPassword: '{{resolve:ssm-secure:/wordpress/db-password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt WebServerSecurityGroup.GroupId
+      MultiAZ: false
+      AllocatedStorage: 20
+      BackupRetentionPeriod: 7
+      DeleteAutomatedBackups: true
