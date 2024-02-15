@@ -116,73 +116,74 @@ Resources:
       Roles:
         - !Ref EC2Role
 
-  WebServerInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      InstanceType: t2.micro
-      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
-      SecurityGroupIds:
-        - !Ref WebServerSecurityGroup
-      SubnetId: !Ref PublicSubnet
-      IamInstanceProfile: !Ref InstanceProfile
-      UserData:
-  Fn::Base64: !Sub |
-    #!/bin/bash -xe
-    # Install necessary packages
-    yum update -y
-    yum install -y httpd php php-mysqlnd php-gd php-xml wget curl unzip zip mysql
-    
-    # Install AWS CLI v2
-    cd /tmp
-    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-    unzip awscliv2.zip
-    sudo ./aws/install
+WebServerInstance:
+  Type: AWS::EC2::Instance
+  Properties:
+    InstanceType: t2.micro
+    ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+    SecurityGroupIds:
+      - !Ref WebServerSecurityGroup
+    SubnetId: !Ref PublicSubnet
+    IamInstanceProfile: !Ref InstanceProfile
+    UserData:
+      Fn::Base64: !Sub |
+        #!/bin/bash -xe
+        # Install necessary packages
+        yum update -y
+        yum install -y httpd php php-mysqlnd php-gd php-xml wget curl unzip zip mysql
+        
+        # Install AWS CLI v2
+        cd /tmp
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
 
-    # Start Apache web server
-    systemctl start httpd
-    systemctl enable httpd
+        # Start Apache web server
+        systemctl start httpd
+        systemctl enable httpd
 
-    # Download and install WordPress
-    cd /var/www/html
-    wget https://wordpress.org/latest.tar.gz
-    tar -xzf latest.tar.gz
-    cp -r wordpress/* .
-    rm -rf wordpress latest.tar.gz
+        # Download and install WordPress
+        cd /var/www/html
+        wget https://wordpress.org/latest.tar.gz
+        tar -xzf latest.tar.gz
+        cp -r wordpress/* .
+        rm -rf wordpress latest.tar.gz
 
-    # Retrieve database credentials from SSM Parameter Store
-    DB_USERNAME=$$(aws ssm get-parameter --name /wordpress/db-username --with-decryption --output text --query Parameter.Value)
-    DB_PASSWORD=$$(aws ssm get-parameter --name /wordpress/db-password --with-decryption --output text --query Parameter.Value)
+        # Retrieve database credentials from SSM Parameter Store
+        DB_USERNAME=$$(aws ssm get-parameter --name /wordpress/db-username --with-decryption --output text --query Parameter.Value)
+        DB_PASSWORD=$$(aws ssm get-parameter --name /wordpress/db-password --with-decryption --output text --query Parameter.Value)
 
-    # Configure WordPress
-    cp wp-config-sample.php wp-config.php
-    sed -i "s/database_name_here/demo_db/g" wp-config.php
-    sed -i "s/username_here/$${DB_USERNAME}/g" wp-config.php
-    sed -i "s/password_here/$${DB_PASSWORD}/g" wp-config.php
+        # Configure WordPress
+        cp wp-config-sample.php wp-config.php
+        sed -i "s/database_name_here/demo_db/g" wp-config.php
+        sed -i "s/username_here/$${DB_USERNAME}/g" wp-config.php
+        sed -i "s/password_here/$${DB_PASSWORD}/g" wp-config.php
 
-    RETRY_COUNT=0
-    MAX_RETRIES=10  # Number of retries
-    DB_ENDPOINT=""
-    while [ -z "$$DB_ENDPOINT" ] && [ $$RETRY_COUNT -lt $$MAX_RETRIES ]; do
-      DB_ENDPOINT=$$(aws rds describe-db-instances --db-instance-identifier demo-db-instance --query 'DBInstances[0].Endpoint.Address' --output text)
-      let RETRY_COUNT=RETRY_COUNT+1 
-      sleep 60  # Increased delay to 60 seconds before retrying
-    done
+        RETRY_COUNT=0
+        MAX_RETRIES=10  # Number of retries
+        DB_ENDPOINT=""
+        while [ -z "$$DB_ENDPOINT" ] && [ $$RETRY_COUNT -lt $$MAX_RETRIES ]; do
+          DB_ENDPOINT=$$(aws rds describe-db-instances --db-instance-identifier demo-db-instance --query 'DBInstances[0].Endpoint.Address' --output text)
+          let RETRY_COUNT=RETRY_COUNT+1 
+          sleep 60  # Increased delay to 60 seconds before retrying
+        done
 
-    # Check if DB_ENDPOINT was successfully retrieved
-    if [ -z "$$DB_ENDPOINT" ]; then
-      echo "Failed to retrieve DB endpoint after $$MAX_RETRIES retries."
-      exit 1
-    fi
+        # Check if DB_ENDPOINT was successfully retrieved
+        if [ -z "$$DB_ENDPOINT" ]; then
+          echo "Failed to retrieve DB endpoint after $$MAX_RETRIES retries."
+          exit 1
+        fi
 
-    # Update the wp-config.php with the DB endpoint
-    sed -i "s/localhost/$${DB_ENDPOINT}/g" wp-config.php
+        # Update the wp-config.php with the DB endpoint
+        sed -i "s/localhost/$${DB_ENDPOINT}/g" wp-config.php
 
-    # Adjust file permissions
-    chown -R apache:apache /var/www/html
-    chmod -R 755 /var/www/html
+        # Adjust file permissions
+        chown -R apache:apache /var/www/html
+        chmod -R 755 /var/www/html
 
-    # Restart Apache to apply changes
-    systemctl restart httpd
+        # Restart Apache to apply changes
+        systemctl restart httpd
+
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
