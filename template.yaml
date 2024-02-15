@@ -164,7 +164,7 @@ Resources:
           MAX_RETRIES=10  # Number of retries
           DB_ENDPOINT=""
           while [ -z "$DB_ENDPOINT" ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier yourActualDbInstanceIdentifier --query 'DBInstances[0].Endpoint.Address' --output text)
+            DB_ENDPOINT=$(aws rds describe-db-instances --db-instance-identifier demo-db-instance --query 'DBInstances[0].Endpoint.Address' --output text)
             let RETRY_COUNT=RETRY_COUNT+1 
             sleep 60  # Increased delay to 60 seconds before retrying
           done
