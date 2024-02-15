@@ -120,7 +120,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      ImageId: ami-0c02fb55956c7d316  # Amazon Linux 2 AMI
+      ImageId: ami-0134dde2b68fe1b07  # Amazon Linux 2 AMI
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
       SubnetId: !Ref PublicSubnet
@@ -147,7 +147,7 @@ Resources:
           chown -R apache:apache /var/www/html
           chmod -R 755 /var/www/html
           systemctl restart httpd
-          
+
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
