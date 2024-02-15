@@ -107,8 +107,7 @@ Resources:
                   - ssm:GetParameter
                   - ssm:GetParameters
                   - ec2:DescribeInstances
-		              - rds:DescribeDBInstances
-
+                  - rds:DescribeDBInstances
                 Resource: '*'
 
   InstanceProfile:
