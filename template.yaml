@@ -120,7 +120,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      ImageId: ami-0134dde2b68fe1b07  # Amazon Linux 2 AMI
+      ImageId: ami-0134dde2b68fe1b07  # changed this into the rhel image
       SecurityGroupIds:
         - !Ref WebServerSecurityGroup
       SubnetId: !Ref PublicSubnet
